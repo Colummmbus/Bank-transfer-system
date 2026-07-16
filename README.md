@@ -11,7 +11,7 @@ Java Swing, JDBC, MySQL을 활용하여 구현한 금융 이체 시스템입니�
 - 🔒 Deadlock Prevention (Lock Ordering)
 - ⚡ Composite Index (Transaction History)
 
----
+--- 
 
 # 주요 기능
 
