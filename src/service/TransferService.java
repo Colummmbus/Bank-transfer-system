@@ -5,6 +5,7 @@ import dao.TransactionDAO;
 import domain.Account;
 import domain.Transaction;
 import exception.AccountNotFoundException;
+import exception.InsufficientBalanceException;
 import exception.TransferFailedException;
 import exception.TransferLimitExceededException;
 import util.DBConnection;
@@ -38,9 +39,7 @@ public class TransferService {
         accountService.validateAccountStatus(fromAccount.getAccountId());
         accountService.validateAccountStatus(toAccount.getAccountId());
         accountService.validateAccountPassword(fromAccount.getAccountId(), accountPassword);
-        accountService.validateSufficientBalance(fromAccount.getAccountId(), amount);
         accountService.validateOneTimeLimit(fromAccount.getAccountId(), amount);
-        validateDailyLimit(fromAccount.getAccountId(), amount);
 
         Connection conn = null;
 
@@ -58,12 +57,32 @@ public class TransferService {
                 throw new TransferFailedException("계좌 락 처리에 실패했습니다.");
             }
 
-            int withdrawResult = accountDAO.withdraw(conn, fromAccount.getAccountId(), amount);
+            Account lockedFromAccount = lockedAccounts.stream()
+                    .filter(account -> account.getAccountId() == fromAccount.getAccountId())
+                    .findFirst()
+                    .orElseThrow(() ->
+                            new TransferFailedException("출금 계좌 락 처리에 실패했습니다."));
+
+            // Lock 획득 후 최신 데이터 기준으로 검증
+            validateSufficientBalance(lockedFromAccount, amount);
+            validateDailyLimit(conn, lockedFromAccount, amount);
+
+            int withdrawResult = accountDAO.withdraw(
+                    conn,
+                    fromAccount.getAccountId(),
+                    amount
+            );
+
             if (withdrawResult == 0) {
                 throw new TransferFailedException("출금 처리에 실패했습니다.");
             }
 
-            int depositResult = accountDAO.deposit(conn, toAccount.getAccountId(), amount);
+            int depositResult = accountDAO.deposit(
+                    conn,
+                    toAccount.getAccountId(),
+                    amount
+            );
+
             if (depositResult == 0) {
                 throw new TransferFailedException("입금 처리에 실패했습니다.");
             }
@@ -77,6 +96,7 @@ public class TransferService {
             );
 
             int transactionId = transactionDAO.save(conn, transaction);
+
             if (transactionId <= 0) {
                 throw new TransferFailedException("거래 기록 저장에 실패했습니다.");
             }
@@ -84,6 +104,7 @@ public class TransferService {
             conn.commit();
 
         } catch (Exception e) {
+
             if (conn != null) {
                 try {
                     conn.rollback();
@@ -94,14 +115,17 @@ public class TransferService {
 
             if (e instanceof AccountNotFoundException)
                 throw (AccountNotFoundException) e;
+
             if (e instanceof TransferLimitExceededException)
                 throw (TransferLimitExceededException) e;
+
             if (e instanceof RuntimeException)
                 throw (RuntimeException) e;
 
             throw new TransferFailedException("이체 처리 중 오류가 발생했습니다.");
 
         } finally {
+
             if (conn != null) {
                 try {
                     conn.setAutoCommit(true);
@@ -137,11 +161,21 @@ public class TransferService {
         }
     }
 
-    private void validateDailyLimit(int fromAccountId, long amount) {
-        long dailyLimit = accountService.getDailyLimit(fromAccountId);
-        long todayAmount = transactionDAO.getTodayTransferAmount(fromAccountId);
+    private void validateSufficientBalance(Account fromAccount, long amount) {
 
-        if (todayAmount + amount > dailyLimit) {
+        if (fromAccount.getBalance() < amount) {
+            throw new InsufficientBalanceException("잔액이 부족합니다.");
+        }
+    }
+
+    private void validateDailyLimit(Connection conn, Account fromAccount, long amount) {
+
+        long todayAmount = transactionDAO.getTodayTransferAmount(
+                conn,
+                fromAccount.getAccountId()
+        );
+
+        if (todayAmount + amount > fromAccount.getDailyLimit()) {
             throw new TransferLimitExceededException("1일 이체 한도를 초과했습니다.");
         }
     }

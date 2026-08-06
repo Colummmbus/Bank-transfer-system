@@ -41,7 +41,7 @@ public class TransactionDAO {
     }
 
     // 2. 오늘 출금 성공 거래 누적 금액 합계 조회
-    public long getTodayTransferAmount(int accountId) {
+    public long getTodayTransferAmount(Connection conn, int accountId) {
         String sql = "SELECT COALESCE(SUM(amount), 0) AS total_amount "
                 + "FROM transactions "
                 + "WHERE from_account_id = ? "
@@ -49,8 +49,7 @@ public class TransactionDAO {
                 + "AND t_status = 'SUCCESS' "
                 + "AND DATE(t_created_at) = CURDATE()";
 
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setInt(1, accountId);
 
