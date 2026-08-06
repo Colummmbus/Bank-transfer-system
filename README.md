@@ -59,7 +59,7 @@ Java Swing, JDBC, MySQL을 활용하여 구현한 금융 이체 시스템입니�
 - 1회 이체 한도
 - 1일 이체 한도
 
-당일 성공한 이 금액을 합산한 뒤 현재 요청 금액을 더하여 일일 한도를 초과하는지 검증하도록 구현했습니다.
+당일 성공한 이체 금액을 합산한 뒤 현재 요청 금액을 더하여 일일 한도를 초과하는지 검증하도록 구현했습니다.
 
 ### 거래내역 조회
 
@@ -97,6 +97,7 @@ Java Swing, JDBC, MySQL을 활용하여 구현한 금융 이체 시스템입니�
 - Java Swing
 - JDBC: Java에서 DB에 접근하기 위한 표준 API로, 트랜잭션을 직접 제어해 원자성을 확보했습니다.
 - MySQL: 관계형 DB의 제약 조건과 트랜잭션, 잠금 기능을 활용해 정합성을 유지하기 위해 선택했습니다.
+- Maven: MySQL Connector/J 의존성 관리를 위해 사용했습니다.
 - Git / GitHub
 
 ---
@@ -104,14 +105,16 @@ Java Swing, JDBC, MySQL을 활용하여 구현한 금융 이체 시스템입니�
 # 프로젝트 구조
 
 ```text
-src
-├─ dao
-├─ domain
-├─ exception
-├─ gui
-├─ main
-├─ service
-└─ util
+├─ src
+│  ├─ dao
+│  ├─ domain
+│  ├─ exception
+│  ├─ gui
+│  ├─ main
+│  ├─ service
+│  └─ util
+├─ schema.sql
+└─ pom.xml
 ```
 
 ---
@@ -146,6 +149,49 @@ src
 - type
 - t_status
 - t_created_at
+
+---
+
+# 실행 방법
+
+## 요구 환경
+
+- Java 21
+- MySQL
+- Maven
+
+## 1. 데이터베이스 생성
+
+MySQL에서 `transfer_db` 데이터베이스를 생성합니다.
+
+```sql
+CREATE DATABASE transfer_db;
+USE transfer_db;
+```
+
+이후 프로젝트 루트의 `schema.sql`을 실행하여 필요한 테이블과 인덱스를 생성합니다.
+
+## 2. 데이터베이스 연결 설정
+
+`src/util/DBConnection.java`에서 로컬 MySQL 환경에 맞게 접속 정보를 설정합니다.
+
+```java
+private static final String URL = "jdbc:mysql://localhost:3306/transfer_db";
+private static final String USER = "root";
+private static final String PASSWORD = "비밀번호";
+```
+
+`PASSWORD`는 실행 시 본인의 로컬 MySQL 비밀번호로 변경해야 합니다.
+
+> 실제 데이터베이스 비밀번호는 GitHub에 커밋하지 않도록 주의하세요.
+
+## 3. Maven 의존성 로드
+
+프로젝트의 `pom.xml`을 Maven 프로젝트로 로드하면 MySQL Connector/J 의존성이 자동으로 설치됩니다.
+
+## 4. 애플리케이션 실행
+
+`src/main/Main.java`를 실행하면 애플리케이션이 시작됩니다.
 
 ---
 
